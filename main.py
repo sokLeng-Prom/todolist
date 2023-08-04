@@ -1,20 +1,20 @@
-from fastapi import FastAPI, status
-from database import Base, engine, TodoClass
-from pydantic import BaseModel
+from fastapi import FastAPI, status, HTTPException
+from database import engine
 from sqlalchemy.orm import Session
 from datetime import datetime
+from models import TodoClass
+from schemas import TodoRequest
 
- 
-#initialize app
+
+# initialize app
 app = FastAPI()
 
-class TodoRequest(BaseModel):
-    content: str
 
-#define end point
+# define end point
 @app.get("/")
 def root():
     return {"todoo"}
+
 
 @app.post("/todo", status_code=status.HTTP_201_CREATED)
 def create_todo(todo: TodoRequest):
@@ -37,28 +37,72 @@ def create_todo(todo: TodoRequest):
     # return the id
     return f"created todo item with id {id}"
 
+
 @app.get("/todo/{id}")
 def read_todo(id: int):
 
     # create a new database session
     session = Session(bind=engine, expire_on_commit=False)
 
-    #get the todo with id
+    # get the todo with id
     todo = session.query(TodoClass).get(id)
 
     session.close()
-    
-    return {f"read todo item with id {todo.id} and task: {todo.content} and timestamp {todo.created_at}"}
+
+    if not todo:
+        raise HTTPException(
+            status_code=404, detail=f"todo item with this id{id} not found")
+    # return {f"read todo item with id {todo.id} and task: {todo.content} and timestamp {todo.created_at}"}
+    return todo
+
 
 @app.put("/todo/{id}")
-def update_todo(id: int):
-    return {"update todo"}
+def update_todo(id: int, content: str):
+    # create a new database session
+    session = Session(bind=engine, expire_on_commit=False)
+
+    # get the todo with id
+    todo = session.query(TodoClass).get(id)
+
+    if todo:
+        todo.content = content
+        session.commit()
+
+    session.close()
+    # check if todo item with given id exists. If not, raise exception and return 404 not found response
+    if not todo:
+        raise HTTPException(
+            status_code=404, detail=f"todo item with id {id} not found")
+    return {f"update todo with this item's id{todo.id} and {todo.content} "}
+
 
 @app.delete("/todo/{id}")
-def delete_todo(id:int):
-    return {"delete todo item"}
+def delete_todo(id: int):
+    # create a new database session
+    session = Session(bind=engine, expire_on_commit=False)
+
+    # get the todo with id
+    todo = session.query(TodoClass).get(id)
+
+    # if given id exist, delete from db
+    if todo:
+        session.delete(todo)
+        session.commit()
+        session.close()
+    else:
+        raise HTTPException(
+            status_code=404, detail=f"todo item with id {id} not found")
+    return None
+
 
 @app.get("/todo")
-def get_all_todo(id: int):
-    return {"read all todo item"}
+def get_all_todo():
+    # create a new database session
+    session = Session(bind=engine, expire_on_commit=False)
 
+    # get the todo with id
+    todo = session.query(TodoClass).all()
+
+    session.close()
+
+    return todo
