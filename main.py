@@ -1,4 +1,4 @@
-from fastapi import FastAPI, status, HTTPException
+from fastapi import FastAPI, status, HTTPException, Request
 from database import engine
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -34,8 +34,17 @@ def create_todo(todo: TodoRequest):
     # close the session
     session.close()
 
+     # Create the new response format
+    response = {
+        "data": {
+            "id": id,
+            "content": todo.content
+        },
+        "response_code": 201,
+        "response_message": "success"
+    }
     # return the id
-    return f"created todo item with id {id}"
+    return response
 
 
 @app.get("/todo/{id}")
@@ -51,13 +60,18 @@ def read_todo(id: int):
 
     if not todo:
         raise HTTPException(
-            status_code=404, detail=f"todo item with this id{id} not found")
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"todo item with this id{id} not found")
     # return {f"read todo item with id {todo.id} and task: {todo.content} and timestamp {todo.created_at}"}
     return todo
 
 
+
 @app.put("/todo/{id}")
-def update_todo(id: int, content: str):
+async def update_todo(id: int, request: Request):
+    # Get the JSON data from the request body
+    data = await request.json()
+    content = data.get("content")
+
     # create a new database session
     session = Session(bind=engine, expire_on_commit=False)
 
@@ -69,12 +83,22 @@ def update_todo(id: int, content: str):
         session.commit()
 
     session.close()
+
     # check if todo item with given id exists. If not, raise exception and return 404 not found response
     if not todo:
         raise HTTPException(
-            status_code=404, detail=f"todo item with id {id} not found")
-    return {f"update todo with this item's id{todo.id} and {todo.content} "}
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"todo item with id {id} not found")
 
+    # Create the new response format
+    response = {
+        "data": {
+            "id": id,
+            "content": content
+        },
+        "response_code": 200,
+        "response_message": "success"
+    }
+    return response
 
 @app.delete("/todo/{id}")
 def delete_todo(id: int):
@@ -90,8 +114,12 @@ def delete_todo(id: int):
         session.commit()
         session.close()
     else:
+        response = {
+            "response_code": 404,
+            "response_message": "Todo not found!"
+        }
         raise HTTPException(
-            status_code=404, detail=f"todo item with id {id} not found")
+            status_code=status.HTTP_404_NOT_FOUND, detail= response)
     return None
 
 
